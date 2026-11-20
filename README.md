@@ -252,6 +252,7 @@ Calo mục tiêu = TDEE - Thâm hụt/ngày
 ## 👥 Thành viên nhóm 
 
 Trần Nam Sơn - 23651831
+
 Lại Minh Quân
 
 ---
