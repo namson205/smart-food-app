@@ -1,41 +1,31 @@
--- ============================================================
--- SMARTFOOD APP - SUPABASE DATABASE SETUP SCRIPT
--- Chạy toàn bộ script này trong Supabase SQL Editor
--- ============================================================
+-- Khởi tạo một lần trong SQL Editor của project Supabase mới.
+-- Chạy trong một transaction để lỗi giữa chừng không để lại schema dở dang.
+BEGIN;
 
--- ============================================================
--- BƯỚC 1: XÓA BẢNG CŨ NẾU TỒN TẠI (để chạy lại sạch)
--- ============================================================
-DROP TABLE IF EXISTS public.saved_items CASCADE;
-DROP TABLE IF EXISTS public.schedules CASCADE;
-DROP TABLE IF EXISTS public.foods CASCADE;
-DROP TABLE IF EXISTS public.users CASCADE;
-
--- ============================================================
--- BƯỚC 2: TẠO 4 BẢNG THEO ĐÚNG SCHEMA
--- ============================================================
-
--- Bảng 1: users - lưu thông tin người dùng & chỉ số dinh dưỡng
-CREATE TABLE public.users (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email           TEXT NOT NULL UNIQUE,
-    password        TEXT NOT NULL,                -- plain text (đủ để demo)
+-- Bảng 1: profiles - tạo khi người dùng hoàn tất onboarding
+CREATE TABLE public.profiles (
+    id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name       TEXT NOT NULL,
     gender          TEXT NOT NULL CHECK (gender IN ('MALE', 'FEMALE')),
     age             INTEGER NOT NULL CHECK (age > 0 AND age < 150),
     height          NUMERIC NOT NULL CHECK (height > 0),  -- cm
     weight          NUMERIC NOT NULL CHECK (weight > 0),  -- kg
     -- 1=Ít vận động, 1.375=Nhẹ, 1.55=Trung bình, 1.725=Nhiều, 1.9=Rất nhiều
-    activity_level  NUMERIC NOT NULL DEFAULT 1.2,
+    activity_level  NUMERIC NOT NULL CHECK (activity_level IN (1.2, 1.375, 1.55, 1.725, 1.9)),
     goal_type       TEXT NOT NULL CHECK (goal_type IN ('LOSE', 'MAINTAIN', 'GAIN')),
     -- Số kg muốn thay đổi (dương = tăng, âm = giảm)
     target_weight_change NUMERIC NOT NULL DEFAULT 0,
     target_weeks    INTEGER NOT NULL DEFAULT 4 CHECK (target_weeks > 0),
     -- Chỉ số tính toán (tự động cập nhật sau onboarding)
-    bmr             NUMERIC,   -- Basal Metabolic Rate (kcal/ngày)
-    tdee            NUMERIC,   -- Total Daily Energy Expenditure (kcal/ngày)
-    daily_calorie_target NUMERIC, -- Mục tiêu calo/ngày (TDEE +/- thâm hụt)
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    bmr             NUMERIC NOT NULL,   -- Basal Metabolic Rate (kcal/ngày)
+    tdee            NUMERIC NOT NULL,   -- Total Daily Energy Expenditure (kcal/ngày)
+    daily_calorie_target NUMERIC NOT NULL CHECK (daily_calorie_target > 0), -- Mục tiêu calo/ngày (TDEE +/- thâm hụt)
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (
+        (goal_type = 'LOSE' AND target_weight_change < 0)
+        OR (goal_type = 'MAINTAIN' AND target_weight_change = 0)
+        OR (goal_type = 'GAIN' AND target_weight_change > 0)
+    )
 );
 
 -- Bảng 2: foods - kho dữ liệu món ăn Việt Nam
@@ -61,7 +51,7 @@ CREATE TABLE public.foods (
 -- Bảng 3: schedules - thời khóa biểu thực đơn 7 ngày của user
 CREATE TABLE public.schedules (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     -- day_of_week: 2=Thứ 2, 3=Thứ 3, ..., 8=Chủ nhật (theo quy ước Việt Nam)
     day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 2 AND 8),
     -- meal_slot: buổi ăn trong ngày
@@ -76,31 +66,56 @@ CREATE TABLE public.schedules (
 -- Bảng 4: saved_items - lưu trữ cá nhân (bookmark món ăn hoặc cả lịch trình)
 CREATE TABLE public.saved_items (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id       UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     item_type     TEXT NOT NULL CHECK (item_type IN ('FOOD', 'SCHEDULE')),
     -- Nếu item_type = 'FOOD': food_id có giá trị
-    food_id       UUID REFERENCES public.foods(id) ON DELETE SET NULL,
+    food_id       UUID REFERENCES public.foods(id) ON DELETE CASCADE,
     -- Nếu item_type = 'SCHEDULE': plan_title và plan_snapshot có giá trị
     plan_title    TEXT,
     -- plan_snapshot: snapshot toàn bộ lịch 7 ngày tại thời điểm lưu
-    -- VD: { "2": {"MORNING": {...food}, "LUNCH": {...food}}, "3": {...} }
+    -- VD: { "2": {"MORNING": {"food_id": "...", "servings": 1.5}} }
     plan_snapshot JSONB,
-    created_at    TIMESTAMPTZ DEFAULT NOW()
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (
+        (item_type = 'FOOD' AND food_id IS NOT NULL AND plan_title IS NULL AND plan_snapshot IS NULL)
+        OR (item_type = 'SCHEDULE' AND food_id IS NULL AND plan_title IS NOT NULL
+            AND plan_snapshot IS NOT NULL AND jsonb_typeof(plan_snapshot) = 'object')
+    )
 );
 
--- ============================================================
--- BƯỚC 3: TẮT ROW LEVEL SECURITY (để gọi nhanh qua Axios)
--- ============================================================
-ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.foods DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.schedules DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.saved_items DISABLE ROW LEVEL SECURITY;
+-- Quyền Data API và quyền truy cập từng hàng.
+REVOKE ALL ON public.profiles, public.foods, public.schedules, public.saved_items
+    FROM PUBLIC, anon, authenticated;
 
--- ============================================================
--- BƯỚC 4: TẠO INDEX để tăng tốc query
--- ============================================================
-CREATE INDEX idx_schedules_user_id ON public.schedules(user_id);
-CREATE INDEX idx_schedules_user_day ON public.schedules(user_id, day_of_week);
+GRANT SELECT ON public.foods TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.schedules, public.saved_items TO authenticated;
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.foods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY foods_read ON public.foods
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY profiles_own ON public.profiles
+    FOR ALL TO authenticated
+    USING ((SELECT auth.uid()) = id)
+    WITH CHECK ((SELECT auth.uid()) = id);
+
+CREATE POLICY schedules_own ON public.schedules
+    FOR ALL TO authenticated
+    USING ((SELECT auth.uid()) = user_id)
+    WITH CHECK ((SELECT auth.uid()) = user_id);
+
+CREATE POLICY saved_items_own ON public.saved_items
+    FOR ALL TO authenticated
+    USING ((SELECT auth.uid()) = user_id)
+    WITH CHECK ((SELECT auth.uid()) = user_id);
+
+CREATE UNIQUE INDEX idx_saved_food_once ON public.saved_items(user_id, food_id)
+    WHERE item_type = 'FOOD';
 CREATE INDEX idx_saved_items_user_id ON public.saved_items(user_id);
 CREATE INDEX idx_foods_category ON public.foods(category);
 CREATE INDEX idx_foods_calories ON public.foods(calories);
@@ -609,19 +624,4 @@ VALUES
   'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?w=800'
 );
 
--- ============================================================
--- BƯỚC 6: KIỂM TRA DỮ LIỆU ĐÃ INSERT
--- ============================================================
-SELECT 
-    name, 
-    category, 
-    calories,
-    protein,
-    carbs,
-    fat,
-    LEFT(image_url, 50) AS image_url_preview
-FROM public.foods 
-ORDER BY category, calories;
-
--- Đếm tổng số món
-SELECT COUNT(*) AS tong_so_mon FROM public.foods;
+COMMIT;

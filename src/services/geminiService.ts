@@ -45,13 +45,13 @@ interface GeminiRequestBody {
 
 /** Kết quả trả về từ Gemini API */
 interface GeminiResponse {
-  candidates: Array<{
+  candidates: {
     content: {
       parts: GeminiPart[];
       role: string;
     };
     finishReason: string;
-  }>;
+  }[];
 }
 
 // ============================================================

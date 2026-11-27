@@ -12,13 +12,11 @@
 // ============================================================
 
 /**
- * User — Thông tin người dùng & chỉ số dinh dưỡng
- * Khớp với bảng `users` trên Supabase
+ * Profile — Thông tin người dùng & chỉ số dinh dưỡng
+ * Khớp với bảng `profiles` trên Supabase
  */
-export interface User {
-  id: string;             // UUID, Primary Key
-  email: string;
-  password: string;       // plain text (đủ để demo)
+export interface Profile {
+  id: string;             // UUID từ Supabase Auth
   full_name: string;
   gender: 'MALE' | 'FEMALE';
   age: number;            // tuổi (năm)
@@ -106,7 +104,7 @@ export interface SavedItem {
   item_type: 'FOOD' | 'SCHEDULE';
   food_id: string | null;         // Dùng khi item_type = 'FOOD'
   plan_title: string | null;      // Dùng khi item_type = 'SCHEDULE'
-  plan_snapshot: WeeklyScheduleSnapshot | null; // Dùng khi item_type = 'SCHEDULE'
+  plan_snapshot: SavedScheduleSnapshot | null; // Dùng khi item_type = 'SCHEDULE'
   created_at?: string;
   food?: Food;                    // Populated khi fetch
 }
@@ -119,9 +117,14 @@ export interface SavedItem {
 export type MealSlot = 'MORNING' | 'LUNCH' | 'AFTERNOON' | 'DINNER';
 
 /**
- * WeeklyScheduleSnapshot — Cấu trúc lịch 7 ngày (dùng trong saved_items.plan_snapshot)
+ * SavedScheduleSnapshot — Bản lưu lịch 7 ngày (saved_items.plan_snapshot)
  * Key là day_of_week dạng string ("2" đến "8")
  */
+export type SavedScheduleSnapshot = Record<string, Partial<Record<MealSlot, {
+  food_id: string;
+  servings: number;
+}>>>;
+
 export type WeeklyScheduleSnapshot = {
   [dayOfWeek: string]: Partial<Record<MealSlot, Food>>;
 };

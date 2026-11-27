@@ -17,7 +17,6 @@
  */
 
 import {
-  User,
   Food,
   MealSchedule,
   MealSlot,
@@ -230,7 +229,7 @@ export function getCompletedAndCurrentSlots(currentHour: number): {
  * "Không cần người dùng bấm tick, app tự biết bữa nào đã qua"
  *
  * @param todaySchedule - Lịch hôm nay: map từ MealSlot → Food (và số servings)
- * @param dailyCalorieTarget - Calo mục tiêu ngày hôm nay (từ User.daily_calorie_target)
+ * @param dailyCalorieTarget - Calo mục tiêu ngày hôm nay (từ Profile.daily_calorie_target)
  * @param tdee - TDEE của người dùng (để tính thâm hụt tích lũy)
  * @param daysSinceStart - Số ngày kể từ ngày bắt đầu dùng app (để tính kg tích lũy)
  * @param now - Thời điểm hiện tại (default: new Date(), có thể mock để test)
