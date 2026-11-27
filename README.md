@@ -56,7 +56,7 @@
 |----------|-----------|------------|
 | **Framework** | React Native + Expo SDK 58 | Cross-platform iOS/Android, dễ build & deploy |
 | **Ngôn ngữ** | TypeScript 6.0 | Type-safe, tránh bug runtime |
-| **Routing** | Expo Router (file-based) | Navigation khai báo qua cây thư mục `app/` |
+| **Routing** | Expo Router (file-based) | Navigation khai báo qua cây thư mục `src/app/` |
 | **UI Library** | TamaGUI 3.3 | Dark/Light mode, Responsive, Animation sẵn có |
 | **State Management** | Redux Toolkit 2.x | Quản lý state toàn cục, DevTools |
 | **HTTP Client** | Axios 1.x | Gọi Supabase REST API & Gemini API |
@@ -91,13 +91,13 @@ Standalone Screens
 ## 🗃️ Database Schema (Supabase)
 
 ```
-users          — Thông tin người dùng & chỉ số dinh dưỡng (BMR, TDEE, mục tiêu)
+profiles       — Hồ sơ, thông tin liên hệ và chỉ số dinh dưỡng, liên kết với Supabase Auth
 foods          — Kho món ăn Việt Nam (calo, protein, carbs, fat, nguyên liệu, công thức)
 schedules      — Thực đơn 7 ngày của user (user_id × day_of_week × meal_slot × food_id)
 saved_items    — Bookmark món ăn hoặc snapshot lịch 7 ngày
 ```
 
-> RLS (Row Level Security) đã tắt để gọi trực tiếp qua Axios với `apikey` header.
+> RLS được bật. Kho món ăn có quyền đọc qua Data API. Hồ sơ, lịch và bookmark chỉ cho phép tài khoản truy cập dữ liệu của mình.
 
 ---
 
@@ -105,7 +105,7 @@ saved_items    — Bookmark món ăn hoặc snapshot lịch 7 ngày
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  TẦNG 1 — Presentation (app/)                       │
+│  TẦNG 1 — Presentation (src/app/)                       │
 │  Expo Router Screens + TamaGUI Components           │
 ├─────────────────────────────────────────────────────┤
 │  TẦNG 2 — Business Logic (src/store/ + src/utils/)  │
@@ -123,28 +123,15 @@ saved_items    — Bookmark món ăn hoặc snapshot lịch 7 ngày
 
 ---
 
-## 📂 Cấu trúc thư mục
+## 📂 Cấu trúc thư mục và các phần dự kiến
 
 ```
 smartfood-app/
-├── app/                          # Tầng 1: Màn hình & Điều hướng (Expo Router)
-│   ├── _layout.tsx               # Root: TamaGUI Provider + Redux Provider
-│   ├── (auth)/
-│   │   ├── login.tsx
-│   │   ├── register.tsx
-│   │   └── onboarding.tsx
-│   ├── (tabs)/
-│   │   ├── index.tsx             # Dashboard
-│   │   ├── schedule.tsx
-│   │   ├── foods.tsx
-│   │   ├── ai-chat.tsx
-│   │   └── profile.tsx
-│   ├── food/[id].tsx             # Dynamic route: chi tiết món ăn
-│   └── analytics.tsx
-│
 ├── src/
+│   ├── app/                      # Expo Router
+│   │   └── index.tsx             # Kho món ăn để kiểm tra kết nối
 │   ├── types/
-│   │   └── models.ts             # TypeScript interfaces (User, Food, MealSchedule...)
+│   │   └── models.ts             # TypeScript interfaces (Profile, Food, MealSchedule...)
 │   ├── services/
 │   │   ├── axiosClient.ts        # Axios instances (Supabase + Gemini)
 │   │   ├── foodService.ts        # CRUD: foods, schedules, saved_items
@@ -171,46 +158,55 @@ smartfood-app/
 
 ## ⚙️ Hướng dẫn Cài đặt & Chạy
 
-### Yêu cầu
-- Node.js ≥ 18
-- Expo CLI (`npm install -g expo-cli`)
-- Tài khoản [Supabase](https://supabase.com) (miễn phí)
-- Gemini API Key từ [Google AI Studio](https://aistudio.google.com) (miễn phí)
+### 1. Chuẩn bị repo
 
-### 1. Clone repository
+Dùng Node.js 22.13+ trên nhánh 22 hoặc Node.js 24.3+ trên nhánh 24. Expo CLI đi kèm project.
+
 ```bash
 git clone https://github.com/namson205/smart-food-app.git
 cd smart-food-app
+npm ci
 ```
 
-### 2. Cài dependencies
+Nếu đã cài dependencies và `package-lock.json` chưa đổi, chạy ngay bước khởi động.
+
+### 2. Kết nối Supabase
+
+Với nhóm đang dùng project **SmartFood**, dùng cùng **Project URL** và **Publishable key** trong mục **Connect** của Supabase. Tạo `.env.local` ở thư mục gốc theo [.env.example](.env.example):
+
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_REPLACE_ME
+```
+
+Git bỏ qua `.env.local`. Hai biến này đủ để chạy bản hiện tại. Gemini sẽ dùng secret phía server khi tích hợp AI vì các biến `EXPO_PUBLIC_` được đưa vào bundle.
+
+Chỉ khi tạo DB mới, chạy [supabase_setup.sql](supabase_setup.sql) một lần trong SQL Editor. Với DB cũ chưa có `profiles.email` và `profiles.phone`, dùng [migration bổ sung thông tin liên hệ](supabase/migrations/20261127000100_add_profile_contact_fields.sql). DB chung SmartFood đã có hai cột.
+
+### 3. Chạy Web và Android từ cùng một terminal
+
 ```bash
-npm install
+npm start
 ```
 
-### 3. Khởi tạo Database Supabase
-1. Tạo project mới trên [supabase.com](https://supabase.com)
-2. Vào **SQL Editor** → paste toàn bộ nội dung file `supabase_setup.sql` → **Run**
-3. Vào **Settings → API** → copy `Project URL` và `anon public key`
+- **Web:** Nhấn `w` để mở địa chỉ localhost mà Expo hiển thị.
+- **Android:** Trên cùng mạng Wi-Fi có kết nối LAN, mở **Expo Go tương thích SDK 58** rồi quét QR trong terminal.
+- **Mạng chặn LAN hoặc điện thoại dùng 4G/5G:** Dừng server bằng `Ctrl+C`, chạy lệnh dưới đây, rồi nhấn `w` cho Web và quét **QR mới** cho Android.
 
-### 4. Cấu hình biến môi trường
-Tạo file `.env` ở thư mục gốc:
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxxxxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-EXPO_PUBLIC_GEMINI_API_KEY=AIzaSy...
-```
-
-> ⚠️ **Không commit file `.env` lên GitHub!** (đã có trong `.gitignore`)
-
-### 5. Chạy ứng dụng
 ```bash
-npm start          # Expo Dev Server
-npm run android    # Android
-npm run ios        # iOS (cần macOS)
+npx expo start --tunnel ngrok
 ```
 
-Quét QR code bằng **Expo Go** trên điện thoại thật để xem ứng dụng.
+Giữ terminal mở trong lúc demo. Nếu Metro vẫn dùng cache cũ sau khi đổi cấu hình hoặc route, có thể thêm `--clear` vào lệnh khởi động. Sau khi đổi `.env.local`, tải lại app để nhận giá trị mới. Khi kết nối Supabase thành công, **Kho món ăn** hiển thị 20 món mẫu trên cả hai nền tảng.
+
+### 4. Kiểm tra trước khi demo
+
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+Các route nằm ở `src/app/`. App cho phép xoay dọc/ngang. Khi thêm màn hình Tamagui, kiểm tra layout trên Web, điện thoại xoay ngang và tablet. Với API riêng của thiết bị, dùng phương án tương thích Web. Cài thư viện bằng `npx expo install <tên-gói>` và kiểm tra gói native có trong Expo Go của SDK 58. Nếu gói cần native module ngoài Expo Go, dùng development build.
 
 ---
 
