@@ -18,6 +18,8 @@
 export interface Profile {
   id: string;             // UUID từ Supabase Auth
   full_name: string;
+  email: string | null;
+  phone: string | null;
   gender: 'MALE' | 'FEMALE';
   age: number;            // tuổi (năm)
   height: number;         // chiều cao (cm)

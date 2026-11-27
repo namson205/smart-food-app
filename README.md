@@ -1,6 +1,6 @@
 # SmartFood (Foodemon)
 
-Ứng dụng Expo/React Native giúp khám phá món Việt, lên thực đơn 7 ngày và ước tính calo theo khẩu phần. Hiện có màn hình **Kho món ăn** để kiểm tra kết nối Supabase. Xem [kế hoạch triển khai](PROJECT_PLAN.md) để biết luồng Auth, onboarding, lịch, dashboard, bookmark và AI.
+Ứng dụng Expo/React Native giúp khám phá món Việt, lên thực đơn 7 ngày và ước tính calo theo khẩu phần. Bản hiện tại có màn hình **Kho món ăn** để kiểm tra kết nối Supabase. Luồng sản phẩm bắt đầu ở **Đăng nhập** khi chưa có phiên, qua **Onboarding** nếu thiếu hồ sơ và vào **Dashboard** khi có hồ sơ. Xem [kế hoạch triển khai](PROJECT_PLAN.md) để biết luồng Auth, onboarding, lịch, dashboard, bookmark và AI.
 
 ## Tạo Supabase chung cho nhóm
 
@@ -35,8 +35,8 @@ npx tsc --noEmit
 
 - `src/app/` chứa route Expo Router đang chạy. `App.tsx` và `index.ts` là scaffold cũ; entry point trong `package.json` là `expo-router/entry`.
 - `src/services/` chứa Axios client, API đọc món và prototype Gemini chưa nối vào giao diện. `src/types/` và `src/utils/` chứa hợp đồng dữ liệu và tính toán.
-- Supabase Auth quản lý tài khoản. Bảng `profiles` lưu thông tin onboarding liên kết bằng ID Auth. `schedules` và `saved_items` thuộc từng người dùng. Bảng `foods` cho phép đọc chung qua app. Quản lý dữ liệu mẫu từ Dashboard bằng tài khoản nhóm có quyền phù hợp.
-- Sau lần khởi tạo, cập nhật schema qua các migration có thứ tự trong Git. Khi có màn hình Auth, dùng hai tài khoản thử để kiểm tra lịch và bookmark chỉ hiển thị cho chủ sở hữu.
+- Supabase Auth quản lý tài khoản. Bảng `profiles` lưu thông tin onboarding và liên hệ (`email`, `phone`), liên kết bằng ID Auth. `schedules` và `saved_items` thuộc từng người dùng. Bảng `foods` cho phép đọc chung qua app. Quản lý dữ liệu mẫu từ Dashboard bằng tài khoản nhóm có quyền phù hợp.
+- Với DB đã tạo bằng script trước khi có trường liên hệ, chạy [migration bổ sung email và số điện thoại](supabase/migrations/20261127000100_add_profile_contact_fields.sql) trong SQL Editor. Project mới đã có hai cột trong script khởi tạo. Sau lần khởi tạo, cập nhật schema qua các migration có thứ tự trong Git. Khi có màn hình Auth, dùng hai tài khoản thử để kiểm tra lịch và bookmark chỉ hiển thị cho chủ sở hữu.
 
 ## Thành viên
 

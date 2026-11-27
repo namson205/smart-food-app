@@ -6,6 +6,8 @@ BEGIN;
 CREATE TABLE public.profiles (
     id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name       TEXT NOT NULL,
+    email           TEXT,  -- Sao chép email từ Supabase Auth khi tạo hồ sơ
+    phone           TEXT,  -- Số liên hệ, giữ được dấu + và số 0 đầu
     gender          TEXT NOT NULL CHECK (gender IN ('MALE', 'FEMALE')),
     age             INTEGER NOT NULL CHECK (age > 0 AND age < 150),
     height          NUMERIC NOT NULL CHECK (height > 0),  -- cm
